@@ -22,10 +22,8 @@ namespace Conexionserver
 {
     public partial class Form1 : Form
     {
-        private MySqlConnection conexion;
         private MySqlCommand comando;
         private MySqlDataReader leer;
-        NetworkStream flujo;
         private Thread hilo;
         TcpListener servidor;
         //Lista de clientes
@@ -63,7 +61,7 @@ namespace Conexionserver
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Error al iniciar servidor: " + ex.Message);
+                Console.WriteLine("Error al iniciar servidor: " + ex.Message);
             }
         }
         //Iniciamos el hilo
@@ -142,7 +140,7 @@ namespace Conexionserver
                                             string idUsuario = leer["id"].ToString();
                                             string nombreUsuario = leer["nombre"].ToString();
                                             string emailUsuario = leer["email"].ToString();
-                                            res="usuario_lista|" + idUsuario + "|" + nombreUsuario + "|" + emailUsuario+";";
+                                            res+="usuario_lista|" + idUsuario + "|" + nombreUsuario + "|" + emailUsuario+";";
 
                                         }
                                         //Envía la lista de usuarios al cliente
@@ -176,13 +174,15 @@ namespace Conexionserver
                                     comando.Parameters.Add("@idu", MySqlDbType.Int32); // Este se actualizará en el loop
 
                                     int miembrosAgregados = 0;
-                                    int usuarioscant= int.Parse(partes[1]);
-                                    foreach (int idUsuario in usuarioscant)
+                                    string [] idsusuarios = partes[3].Split(',');
+                                    foreach (string idUsuarioStr in idsusuarios)
                                     {
-                                        // Actualizar el valor del parámetro del usuario
-                                        comando.Parameters["@idu"].Value = idUsuario;
-                                        comando.ExecuteNonQuery();
-                                        miembrosAgregados++;
+                                        if (int.TryParse(idUsuarioStr, out int idUsuario))
+                                        {
+                                            comando.Parameters["@idu"].Value = idUsuario;
+                                            comando.ExecuteNonQuery();
+                                            miembrosAgregados++;
+                                        }
                                     }
 
                                     // Solo mostramos un mensaje de éxito si realmente se agregaron miembros
@@ -239,56 +239,7 @@ namespace Conexionserver
             }
         }
 
-        //Guardar mensaje en la base de datos
-        private void guardam(int idUsuario, int idGrupo, string contenido)
-        {
-            try
-            {
-                using (conexion = new MySqlConnection(MYSQL_CONNECTION_STRING))
-                {
-                    conexion.Open();
-                    string consulta = "INSERT INTO mensajes (idUsuario, idGrupo, contenido, fechaHora) VALUES (@idUsuario, @idGrupo, @contenido, @fechaHora)";
-                    using (comando = new MySqlCommand(consulta, conexion))
-                    {
-                        comando.Parameters.AddWithValue("@idUsuario", idUsuario);
-                        comando.Parameters.AddWithValue("@idGrupo", idGrupo);
-                        comando.Parameters.AddWithValue("@contenido", contenido);
-                        comando.Parameters.AddWithValue("@fechaHora", DateTime.Now);
-                        comando.ExecuteNonQuery();
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("Error al guardar mensaje: " + ex.Message);
-            }
-        }
-
-        //Manda el mensaje a todos los demas conectados
-        private void mandam(string mensaje, TcpClient clienteRemitente)
-        {
-            byte[] datos = Encoding.UTF8.GetBytes(mensaje);
-            //La palabra lock se usa par un hilo a la vez
-            lock (clientes)
-            {
-                //Enviamos  todos los clientes el mensje de respuesta
-                foreach (var cliente in clientes)
-                {
-                    if (cliente != clienteRemitente)
-                    {
-                        try
-                        {
-                            NetworkStream flujo = cliente.GetStream();
-                            flujo.Write(datos, 0, datos.Length);
-                        }
-                        catch (Exception ex)
-                        {
-                            Console.WriteLine("Error enviando mensaje: " + ex.Message);
-                        }
-                    }
-                }
-            }
-        }
+        
 
         //Funcion de agregar usuario
         private void agregausuario(string usuario, string contrasena, TcpClient cliente)
@@ -301,7 +252,7 @@ namespace Conexionserver
             string idUsuario = string.Empty;
             string nombreUsuario = string.Empty;
 
-            flujo = cliente.GetStream();
+            NetworkStream flujo = cliente.GetStream();
             lock (lockUsuarios)
             {
                 if (usuariosConectados.ContainsKey(email))
@@ -318,7 +269,7 @@ namespace Conexionserver
             //Bloque de Código para la consulta de la contraseña en la base de datos
             try
             {
-                using (conexion = new MySqlConnection(MYSQL_CONNECTION_STRING))
+                using ( MySqlConnection conexion = new MySqlConnection(MYSQL_CONNECTION_STRING))
                 {
                     conexion.Open();
                     //Consulta de la contraseña para el email proporcionado
@@ -342,7 +293,7 @@ namespace Conexionserver
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Error al conectar con la base de datos: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                Console.WriteLine("Error al conectar con la base de datos: " + ex.Message);
                 return;
             }
 
@@ -370,8 +321,7 @@ namespace Conexionserver
             if (contravalida)
             {
                 //Regres de respuest un -1 de que se logro iniciar sesion
-                NetworkStream flujo = cliente.GetStream();
-                using (conexion = new MySqlConnection(MYSQL_CONNECTION_STRING))
+                using (MySqlConnection conexion = new MySqlConnection(MYSQL_CONNECTION_STRING))
                 {
                     conexion.Open();
                     //obtiene el email,id del usuario y nombre
@@ -398,7 +348,6 @@ namespace Conexionserver
             {
                 //Contraseña incorrecta
                 //Regres de respuest un 0 de que no se logro iniciar sesion
-                NetworkStream flujo = cliente.GetStream();
                 usuariosConectados.Remove(email);
                 //Quito de la lista de usuarios conectados
                 clientes.Remove(cliente);
@@ -415,17 +364,17 @@ namespace Conexionserver
             // HASH DE LA CONTRASEÑA
             string hashedPass = PasswordHelper.HashPassword(partes[3]);
             string respuesta;
+            MySqlConnection conexion = new MySqlConnection(MYSQL_CONNECTION_STRING);
             NetworkStream flujo;
             // GUARDAR EN BASE DE DATOS
             try
             {
-                conexion = new MySqlConnection(MYSQL_CONNECTION_STRING);
                 if (conexion.State != ConnectionState.Open)
                 {
                     conexion.Open();
                 }
                 // Verificar si el email ya existe
-                if (EmailExiste(partes[2]))
+                if (EmailExiste(partes[2], conexion))
                 {
                     //Enviar error al cliente
                     flujo = cliente.GetStream();
@@ -456,21 +405,23 @@ namespace Conexionserver
             catch (Exception ex)
             {
                 flujo = cliente.GetStream();
-                respuesta = "5|No se pudo agregar";
+                respuesta = "5|No se pudo agregar" + ex.Message;
                 byte[] datos1 = Encoding.UTF8.GetBytes(respuesta);
                 flujo.Write(datos1, 0, datos1.Length);
             }
             finally
             {
                 if (conexion.State == ConnectionState.Open && conexion != null)
+                {
                     conexion.Close();
+                }
             }
         }
 
-        private bool EmailExiste(string email)
+        private bool EmailExiste(string email, MySqlConnection conexion)
         {
             string query = "SELECT COUNT(id) FROM usuarios WHERE email = @email";
-            using (MySqlCommand comando = new MySqlCommand(query, this.conexion))
+            using (MySqlCommand comando = new MySqlCommand(query, conexion))
             {
                 comando.Parameters.AddWithValue("@email", email);
                 int count = Convert.ToInt32(comando.ExecuteScalar());
@@ -489,7 +440,7 @@ namespace Conexionserver
             //guarda en base de datos
             try
             {
-                using (conexion = new MySqlConnection(MYSQL_CONNECTION_STRING))
+                using (MySqlConnection conexion = new MySqlConnection(MYSQL_CONNECTION_STRING))
                 {
                     conexion.Open();
                     // Insertar grupo
