@@ -8,6 +8,7 @@ using System.ComponentModel;
 using System.Data;
 using System.Data.SqlClient;
 using System.Drawing;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
@@ -17,6 +18,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using static Org.BouncyCastle.Asn1.Cmp.Challenge;
+using static System.Windows.Forms.VisualStyles.VisualStyleElement;
 using static System.Windows.Forms.VisualStyles.VisualStyleElement.ListView;
 namespace Conexionserver
 {
@@ -497,6 +499,17 @@ namespace Conexionserver
                 flujo.Write(datos2, 0, datos2.Length);
             }
         }
+
+
+        ///Funcions de chat principal
+        ///
+        private void cargarEmojis()
+        {
+            emojis[":smile:"] = Image.FromFile(Path.Combine(Application.StartupPath, @"..\..\Resources\smile.png"));
+            emojis[":heart:"] = Image.FromFile(Path.Combine(Application.StartupPath, @"..\..\Resources\heart.png"));
+            emojis[":sad:"] = Image.FromFile(Path.Combine(Application.StartupPath, @"..\..\Resources\sad.png"));
+        }
+
     }
 }
 
