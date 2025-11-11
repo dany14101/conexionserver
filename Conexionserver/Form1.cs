@@ -214,14 +214,15 @@ namespace Conexionserver
                         string contenido = partes[3];
                         guardarMensaje(idUsuario, idGrupo, contenido, cliente);
                     }
-                    if (partes[0] == "ObtenerIDGrupo")
+                    if (partes[0] == "Obtenerclave")
                     {
+                        //id==clave del grupo
                         string nombreGrupo = partes[1];
 
                         using (MySqlConnection conexion = new MySqlConnection(MYSQL_CONNECTION_STRING))
                         {
                                 conexion.Open();
-                                string query = "SELECT id FROM grupos WHERE Nombre_grupo = @nombreGrupo";
+                                string query = "SELECT clave_grupo FROM grupos WHERE Nombre_grupo = @nombreGrupo";
 
                                 using (MySqlCommand comando = new MySqlCommand(query, conexion))
                                 {
@@ -234,13 +235,12 @@ namespace Conexionserver
                                     if (resultado != null)
                                     {
                                         string idGrupo = resultado.ToString();
-                                        // Devuelve un formato estándar al cliente
                                         respuesta = "OK|"+idGrupo;
                                     }
                                     else
                                     {
-                                        //Pendiente chequeo
-                                        respuesta = "";
+                                        //manda error
+                                        respuesta = "error|";
                                     }
 
                                     byte[] datos = Encoding.UTF8.GetBytes(respuesta);
@@ -258,25 +258,25 @@ namespace Conexionserver
 
                                 string res = "";
 
-                                //Obtener la clave del grupo 
-                                string queryClave = "SELECT clave_grupo FROM grupos WHERE Nombre_grupo = @nombreGrupo";
+                                //Obtener las claves del grupo segun el id del usuario
+                                string queryClave = "SELECT id_grupo FROM miembros_grupos WHERE id_usuario = @id";
                                 string claveGrupo = "";
 
                                 using (MySqlCommand comando = new MySqlCommand(queryClave, conexion))
                                 {
-                                    comando.Parameters.AddWithValue("@nombreGrupo", partes[1]);
+                                    comando.Parameters.AddWithValue("@id", partes[1]);
                                     using (MySqlDataReader leer = comando.ExecuteReader())
                                     {
                                         if (leer.Read())
                                         {
-                                            claveGrupo = leer["clave_grupo"].ToString();
+                                            claveGrupo = leer["id_grupo"].ToString();
                                         }
                                     }
                                 }
 
                                 if (string.IsNullOrEmpty(claveGrupo))
                                 {
-                                    res = "";
+                                    res = "error|";
                                 }
                                 else
                                 {
@@ -285,7 +285,7 @@ namespace Conexionserver
 
                                     using (MySqlCommand comando2 = new MySqlCommand(queryGrupos, conexion))
                                     {
-                                        comando2.Parameters.AddWithValue("@idUsuario", partes[2]); 
+                                        comando2.Parameters.AddWithValue("@idUsuario", partes[1]); 
 
                                         using (MySqlDataReader leer2 = comando2.ExecuteReader())
                                         {
@@ -299,10 +299,10 @@ namespace Conexionserver
 
                                     if (string.IsNullOrEmpty(res))
                                     {
-                                        res = "";
+                                        res = "ERROR|";
                                     }
                                     //Juntar clave y res
-                                    res = $"{claveGrupo}|{res}";
+                                    res = res+ ";";
                                 }
                                 byte[] datos = Encoding.UTF8.GetBytes(res);
                                 flujo.Write(datos, 0, datos.Length);
