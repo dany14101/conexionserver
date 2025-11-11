@@ -299,7 +299,7 @@ namespace Conexionserver
 
                                     if (string.IsNullOrEmpty(res))
                                     {
-                                        res = "ERROR|";
+                                        res = "error|";
                                     }
                                     //Juntar clave y res
                                     res = res+ ";";
