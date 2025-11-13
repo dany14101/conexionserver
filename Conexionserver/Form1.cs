@@ -678,10 +678,30 @@ namespace Conexionserver
 
 
         //Codigo para guardar mensaje a la base de datos
-        private void guardarMensaje(int idUsuario, int idGrupo, string contenido, TcpClient cliente)
+        private void guardarMensaje(int idUsuario, int clave, string contenido, TcpClient cliente)
         {
             try
             {
+                int idg;
+                //Obtenemos el id del grupo
+                using (MySqlConnection conexion = new MySqlConnection(MYSQL_CONNECTION_STRING))
+                {
+                    conexion.Open();
+                    string sql1= "SELECT id FROM grupos WHERE clave_grupo = @clave";
+                    using (MySqlCommand cmdGetId = new MySqlCommand(sql1, conexion))
+                    {
+                        cmdGetId.Parameters.AddWithValue("@clave", clave);
+                        //Object para cualquier tipo de dato
+                        object result = cmdGetId.ExecuteScalar();
+                        if (result == null)
+                        {
+                            string error = "5|error|Grupo no encontrado";
+                            enviaraus(cliente, error);
+                            return;
+                        }
+                        idg = Convert.ToInt32(result);
+                    }
+                }
                 using (MySqlConnection conexion = new MySqlConnection(MYSQL_CONNECTION_STRING))
                 {
                     conexion.Open();
@@ -689,19 +709,19 @@ namespace Conexionserver
                     using (MySqlCommand cmd = new MySqlCommand(sql, conexion))
                     {
                         cmd.Parameters.AddWithValue("@idu", idUsuario);
-                        cmd.Parameters.AddWithValue("@idg", idGrupo);
+                        cmd.Parameters.AddWithValue("@idg", idg);
                         cmd.Parameters.AddWithValue("@cont", contenido);
                         cmd.ExecuteNonQuery();
                     }
                 }
                 //Manda el mensaje a los demas miembros
-                mandarm(idUsuario, idGrupo, contenido);
-                string respuesta = "5|OK";
+                mandarm(idUsuario, idg, contenido);
+                string respuesta = "5|ok";
                 enviaraus(cliente, respuesta);
             }
             catch (Exception ex)
             {
-                string error = "5|ERROR|" + ex.Message;
+                string error = "5|error|" + ex.Message;
                 enviaraus(cliente, error);
             }
         }
@@ -760,7 +780,7 @@ namespace Conexionserver
                 {
                     conexion.Open();
 
-                    // obtener el id del grupo
+                    //obtener el id del grupo
                     using (MySqlCommand cmdGetId = new MySqlCommand("SELECT id FROM grupos WHERE Nombre_grupo=@nom", conexion))
                     {
                         cmdGetId.Parameters.AddWithValue("@nom", nombreGrupo);
@@ -776,7 +796,7 @@ namespace Conexionserver
 
                         int idGrupo = Convert.ToInt32(result);
 
-                        // obtiener los mensajes del grupo
+                        //obtiene los mensajes del grupo
                         string sql = @"SELECT m.contenido, m.fecha, m.Id_usuario, u.nombre AS nombre_usuario FROM mensajes m JOIN usuarios u ON m.Id_usuario = u.id WHERE m.Id_grupo=@id  ORDER BY m.fecha ASC";
 
                         using (MySqlCommand cmdMensajes = new MySqlCommand(sql, conexion))
@@ -787,10 +807,9 @@ namespace Conexionserver
                                 string resultado = "";
                                 while (reader.Read())
                                 {
-                                    resultado += reader["nombre_usuario"] + "-" +reader["contenido"] + "-" +reader["fecha"] + ";";
+                                    resultado += reader["nombre_usuario"] + "|" + reader["contenido"] + "|" + reader["fecha"] + ";";
                                 }
-                                string respuesta = "4|" + idGrupo + "|" + resultado;
-                                enviaraus(cliente, respuesta);
+                                enviaraus(cliente, resultado);
                             }
                         }
                     }
