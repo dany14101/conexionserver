@@ -160,11 +160,13 @@ namespace Conexionserver
                             try
                             {
                                 conexion.Open();
+                                //Hacemos una lista con los ids de los usuarios a agregar
+                                List<int> idusuariosf = new List<int>();
                                 string query = "INSERT INTO miembros_grupos (id_usuario, id_grupo) VALUES (@idu, @idg)";
                                 using (MySqlCommand comando = new MySqlCommand(query, conexion))
                                 {
                                     int idGrupo = int.Parse(partes[2]);
-
+                                   
                                     comando.Parameters.Add("@idu", MySqlDbType.Int32);
                                     comando.Parameters.Add("@idg", MySqlDbType.Int32).Value = idGrupo;
 
@@ -181,6 +183,31 @@ namespace Conexionserver
                                             if (result > 0)
                                             {
                                                 miembrosAgregados++;
+                                                idusuariosf.Add(idUsuario);
+                                            }
+                                        }
+                                    }
+                                    //Notificamos a los usuarios agregados si estan conectados
+                                    foreach (int idUsuario in idusuariosf)
+                                    {
+                                        //Obtenemos el email del usuario
+                                        string emailUsuario = "";
+                                        using (MySqlCommand cmdEmail = new MySqlCommand("SELECT email FROM usuarios WHERE id=@id", conexion))
+                                        {
+                                            cmdEmail.Parameters.AddWithValue("@id", idUsuario);
+                                            object result = cmdEmail.ExecuteScalar();
+                                            if (result != null)
+                                            {
+                                                emailUsuario = result.ToString();
+                                            }
+                                        }
+                                        lock (lockUsuarios)
+                                        {
+                                            if (usuariosConectados.ContainsKey(emailUsuario))
+                                            {
+                                                TcpClient cli = usuariosConectados[emailUsuario];
+                                                string mensaje = "nuevo_miembro|" + partes[1] + "|" + idUsuario;
+                                                enviaraus(cli, mensaje);
                                             }
                                         }
                                     }
