@@ -206,7 +206,7 @@ namespace Conexionserver
                                             if (usuariosConectados.ContainsKey(emailUsuario))
                                             {
                                                 TcpClient cli = usuariosConectados[emailUsuario];
-                                                string mensaje = "nuevo_miembro|" + partes[1] + "|" + idUsuario;
+                                                string mensaje = "agregar_grupos|" + partes[1];
                                                 enviaraus(cli, mensaje);
                                             }
                                         }
