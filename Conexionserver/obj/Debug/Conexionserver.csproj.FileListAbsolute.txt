@@ -27,7 +27,6 @@ C:\Users\danyl\source\repos\Conexionserver\Conexionserver\obj\Debug\Conexionserv
 C:\Users\danyl\source\repos\Conexionserver\Conexionserver\obj\Debug\Conexion.A31A3C76.Up2Date
 C:\Users\danyl\source\repos\Conexionserver\Conexionserver\obj\Debug\Conexionserver.exe
 C:\Users\danyl\source\repos\Conexionserver\Conexionserver\obj\Debug\Conexionserver.pdb
-C:\Users\danyl\source\repos\Conexionserver\Conexionserver\obj\Debug\Conexionserver.exe.config
 C:\Users\danyl\source\repos\Conexionserver\Conexionserver\bin\Debug\BouncyCastle.Cryptography.dll
 C:\Users\danyl\source\repos\Conexionserver\Conexionserver\bin\Debug\Google.Protobuf.dll
 C:\Users\danyl\source\repos\Conexionserver\Conexionserver\bin\Debug\K4os.Compression.LZ4.dll
