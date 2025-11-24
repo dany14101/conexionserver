@@ -8,7 +8,9 @@ using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
+using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Web;
 using System.Windows.Forms;
 using MySql.Data.MySqlClient;
@@ -189,6 +191,17 @@ namespace Conexionserver
                                             }
                                         }
                                     }
+                                    string nombregr="";
+                                    //Checar el nombre del grupo
+                                    using (MySqlCommand cmdEmail = new MySqlCommand("SELECT Nombre_grupo FROM grupos WHERE clave_grupo=@id", conexion))
+                                    {
+                                        cmdEmail.Parameters.AddWithValue("@id", partes[2]);
+                                        object result1 = cmdEmail.ExecuteScalar();
+                                        if (result1 != null)
+                                        {
+                                            nombregr = result1.ToString();
+                                        }
+                                    }
                                     //Notificamos a los usuarios agregados si estan conectados
                                     foreach (int idUsuario in idusuariosf)
                                     {
@@ -208,8 +221,8 @@ namespace Conexionserver
                                             if (usuariosConectados.ContainsKey(emailUsuario))
                                             {
                                                 TcpClient cli = usuariosConectados[emailUsuario];
-                                                string mensaje = "agregar_grupos|" + partes[1];
-                                                enviaraus(cli, mensaje);
+                                                string mensaje = "agregar_grupos|" + nombregr;
+                                                Tcpcod.Enviar(cli,mensaje);
                                             }
                                         }
                                     }
@@ -421,8 +434,9 @@ namespace Conexionserver
                         nombreUsuario = leer["nombre"].ToString();
                     }
                     leer.Close();
-                    //Lo agrega a la lista de usuarios conectados
-                    usuariosConectados.Add(email, cliente);
+                    //Obtenemos el flujo del cliente que esta iniciando
+                    NetworkStream flujo1= cliente.GetStream();
+                    usuariosConectados.Add(email,cliente);
                 }
             }
             catch (Exception ex)
@@ -716,7 +730,7 @@ namespace Conexionserver
                         if (result == null)
                         {
                             string error = "5|error|Grupo no encontrado";
-                            enviaraus(cliente, error);
+                            _ = enviaraus(cliente, error);
                             return;
                         }
                         idg = Convert.ToInt32(result);
@@ -737,12 +751,12 @@ namespace Conexionserver
                 //Manda el mensaje a los demas miembros
                 mandarm(idUsuario, idg, contenido,cliente);
                 string respuesta = "5|ok";
-                enviaraus(cliente, respuesta);
+                _ = enviaraus(cliente, respuesta);
             }
             catch (Exception ex)
             {
                 string error = "5|error|" + ex.Message;
-                enviaraus(cliente, error);
+                _ = enviaraus(cliente, error);
             }
         }
 
@@ -750,21 +764,12 @@ namespace Conexionserver
         private void mandarm(int idUsuario, int idGrupo, string contenido,TcpClient cliente)
         {
             string nombreUsuario = "";
-            string claveGrupo = "";
+            string claveGrupo = idGrupo.ToString();
             using (MySqlConnection conexion = new MySqlConnection(MYSQL_CONNECTION_STRING))
             {
                 conexion.Open();
                 //Obtener la clave de grupo 
-                using(MySqlCommand cmdGetClave = new MySqlCommand("SELECT clave_grupo FROM grupos WHERE id=@id", conexion))
-                {
-                    cmdGetClave.Parameters.AddWithValue("@id", idGrupo);
-                    object result = cmdGetClave.ExecuteScalar();
-                    if (result == null)
-                    {
-                        return; 
-                    }
-                    claveGrupo = result.ToString();
-                }
+
                 //obtener el nombre del usuario de todas las personas en el grupo
                 using (MySqlCommand cmdGetName = new MySqlCommand("SELECT id_usuario FROM miembros_grupos WHERE id_grupo=@id", conexion))
                 {
@@ -813,7 +818,7 @@ namespace Conexionserver
                                         //Obtenemos el TCP del cliente activo
                                         TcpClient cli = usuariosConectados[emailMiembro];
                                         string mensaje = "mensaje_nuevo|" + claveGrupo + "|" + nombreUsuario + "|" + contenido;
-                                        enviaraus(cli, mensaje);
+                                        _ = enviaraus(cli, mensaje);
                                     }
                                 }
                             }
@@ -843,7 +848,7 @@ namespace Conexionserver
                         if (result == null)
                         {
                             string error = "4|ERROR|Grupo no encontrado";
-                            enviaraus(cliente, error);
+                            _ = enviaraus(cliente, error);
                             return;
                         }
 
@@ -862,7 +867,7 @@ namespace Conexionserver
                                 {
                                     resultado += reader["nombre_usuario"] + "|" + reader["contenido"] + "|" + reader["fecha"] + ";";
                                 }
-                                enviaraus(cliente, resultado);
+                                _ = enviaraus(cliente, resultado);
                             }
                         }
                     }
@@ -871,17 +876,22 @@ namespace Conexionserver
             catch (Exception ex)
             {
                 string error = "4|error|" + ex.Message;
-                enviaraus(cliente, error);
+                _=enviaraus(cliente, error);
             }
         }
 
-        private void enviaraus(TcpClient cliente, string mensaje)
+        private async Task enviaraus(TcpClient cliente, string mensaje)
         {
             try
             {
-                NetworkStream flujo = cliente.GetStream();
-                byte[] datos = Encoding.UTF8.GetBytes(mensaje);
-                flujo.Write(datos, 0, datos.Length);
+                if (!mensaje.EndsWith("\n"))
+                {
+                    mensaje = mensaje + "\n";
+                }
+                NetworkStream net=cliente.GetStream();
+                byte[] bytes = Encoding.UTF8.GetBytes(mensaje);
+                net.Write(bytes, 0, bytes.Length);
+                net.Flush();
             }
             catch (Exception ex)
             {
@@ -892,7 +902,7 @@ namespace Conexionserver
 }
 
 
-public static class TcpHelper
+public static class Tcpcod
 {
     //Envía un mensaje a un cliente TcpClient
     public static void Enviar(TcpClient cliente, string mensaje)
@@ -911,7 +921,7 @@ public static class TcpHelper
         }
     }
     //Envía un mensaje a un flujo de red NetworkStream
-    public static void Enviar(NetworkStream flujo, string mensaje)
+    public static void Enviar1(NetworkStream flujo, string mensaje)
     {
         try
         {
