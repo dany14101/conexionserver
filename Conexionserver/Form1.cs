@@ -1,19 +1,20 @@
-﻿using System;
+﻿using MySql.Data.MySqlClient;
+using Mysqlx;
+using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Drawing;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Web;
 using System.Windows.Forms;
-using MySql.Data.MySqlClient;
 namespace Conexionserver
 {
     public partial class Form1 : Form
@@ -145,6 +146,7 @@ namespace Conexionserver
                                         //Envía la lista de usuarios al cliente
                                         byte[] datos = Encoding.UTF8.GetBytes(res);
                                         flujo.Write(datos, 0, datos.Length);
+                                        flujo.Flush();
                                     }
                                 }
                             }
@@ -153,6 +155,7 @@ namespace Conexionserver
                                 string res = "1" + ex.Message;
                                 byte[] datos = Encoding.UTF8.GetBytes(res);
                                 flujo.Write(datos, 0, datos.Length);
+                                flujo.Flush();
                             }
                         }
                     }
@@ -230,6 +233,7 @@ namespace Conexionserver
                                     res = "Usuarios agregados:"+miembrosAgregados;
                                     byte[] datos = Encoding.UTF8.GetBytes(res);
                                     flujo.Write(datos, 0, datos.Length);
+                                    flujo.Flush();
                                 }
                             }
                             catch (Exception ex)
@@ -237,6 +241,7 @@ namespace Conexionserver
                                 res = "Error al agregar miembros: " + ex.Message;
                                 byte[] datos = Encoding.UTF8.GetBytes(res);
                                 flujo.Write(datos, 0, datos.Length);
+                                flujo.Flush();
                             }
                         }
                     }
@@ -268,7 +273,7 @@ namespace Conexionserver
                     {
                         //id==clave del grupo
                         string nombreGrupo = partes[1];
-
+                        nombreGrupo = nombreGrupo.Replace("\n", "");
                         using (MySqlConnection conexion = new MySqlConnection(MYSQL_CONNECTION_STRING))
                         {
                                 conexion.Open();
@@ -285,16 +290,17 @@ namespace Conexionserver
                                     if (resultado != null)
                                     {
                                         string idGrupo = resultado.ToString();
-                                        respuesta = "OK|"+idGrupo;
+                                        respuesta = idGrupo;
                                     }
                                     else
                                     {
                                         //manda error
                                         respuesta = "error|";
                                     }
-
+                                    respuesta = "Obtenerclave|" + respuesta+"\n";
                                     byte[] datos = Encoding.UTF8.GetBytes(respuesta);
                                     flujo.Write(datos, 0, datos.Length);
+                                    flujo.Flush();
                                 }
                         }
                     }
@@ -306,7 +312,7 @@ namespace Conexionserver
                             {
                                 conexion.Open();
 
-                                string res = "";
+                                string res = "agregar_grupos1|";
 
                                 //Obtener las claves del grupo segun el id del usuario
                                 string queryClave = "SELECT id_grupo FROM miembros_grupos WHERE id_usuario = @id";
@@ -326,7 +332,7 @@ namespace Conexionserver
 
                                 if (string.IsNullOrEmpty(claveGrupo))
                                 {
-                                    res = "error|";
+                                    res = "";
                                 }
                                 else
                                 {
@@ -349,10 +355,10 @@ namespace Conexionserver
 
                                     if (string.IsNullOrEmpty(res))
                                     {
-                                        res = "error|";
+                                        res = "";
                                     }
                                     //Juntar clave y res
-                                    res = res+ ";";
+                                    res = res+ "\n";
                                 }
                                 byte[] datos = Encoding.UTF8.GetBytes(res);
                                 flujo.Write(datos, 0, datos.Length);
@@ -408,6 +414,7 @@ namespace Conexionserver
                     string resp = "1|Usuario iniciado";
                     byte[] datos = Encoding.UTF8.GetBytes(resp);
                     flujo.Write(datos, 0, datos.Length);
+                    flujo.Flush();
                     return;
                 }
             }
@@ -663,7 +670,7 @@ namespace Conexionserver
         {
             string simi = partes[1];  
             string idUsuario = partes[2]; 
-            string res = "0|";
+            string res = "buscar_grupo|";
             NetworkStream flujo = cliente.GetStream();
 
             using (MySqlConnection conexion = new MySqlConnection(MYSQL_CONNECTION_STRING))
@@ -687,22 +694,23 @@ namespace Conexionserver
                                 string nombreGrupo = leer["Nombre_grupo"].ToString();
 
                                 //enviar datos
-                                res += nombreGrupo+"|";
+                                res += nombreGrupo+";";
                             }
                         }
                     }
 
-                    if (res == "0|")
+                    if (res == "buscar_grupo|")
                     {
-                        res = "0|No se encontraron grupos coincidentes";
+                        res = "buscar_grupo|0";
                     }
+                    res = res + "\n";
 
                     byte[] datos = Encoding.UTF8.GetBytes(res);
                     flujo.Write(datos, 0, datos.Length);
                 }
                 catch (Exception ex)
                 {
-                    string error = "1|" + ex.Message;
+                    string error = "buscar_grupo|" + ex.Message+"\n";
                     byte[] datos = Encoding.UTF8.GetBytes(error);
                     flujo.Write(datos, 0, datos.Length);
                 }
@@ -714,6 +722,7 @@ namespace Conexionserver
         //Codigo para guardar mensaje a la base de datos
         private void guardarMensaje(int idUsuario, int clave, string contenido, TcpClient cliente)
         {
+            contenido = contenido.Replace("\n", "");
             try
             {
                 int idg;
@@ -730,7 +739,7 @@ namespace Conexionserver
                         if (result == null)
                         {
                             string error = "5|error|Grupo no encontrado";
-                            _ = enviaraus(cliente, error);
+                            Tcpcod.Enviar(cliente, error);
                             return;
                         }
                         idg = Convert.ToInt32(result);
@@ -750,83 +759,94 @@ namespace Conexionserver
                 }
                 //Manda el mensaje a los demas miembros
                 mandarm(idUsuario, idg, contenido,cliente);
-                string respuesta = "5|ok";
-                _ = enviaraus(cliente, respuesta);
             }
             catch (Exception ex)
             {
                 string error = "5|error|" + ex.Message;
-                _ = enviaraus(cliente, error);
+                Tcpcod.Enviar(cliente, error);
             }
         }
 
         //Manda mensaje a todos los miembros del grupo
         private void mandarm(int idUsuario, int idGrupo, string contenido,TcpClient cliente)
         {
+            //Cambiar a entero clavegrupo
             string nombreUsuario = "";
             string claveGrupo = idGrupo.ToString();
             using (MySqlConnection conexion = new MySqlConnection(MYSQL_CONNECTION_STRING))
             {
                 conexion.Open();
-                //Obtener la clave de grupo 
+                List<int> miembrosIds = new List<int>();
+                //Obtenemos la clave del grupo
+                string query = "SELECT clave_grupo FROM grupos WHERE id = @id";
 
-                //obtener el nombre del usuario de todas las personas en el grupo
-                using (MySqlCommand cmdGetName = new MySqlCommand("SELECT id_usuario FROM miembros_grupos WHERE id_grupo=@id", conexion))
+                using (MySqlCommand comando = new MySqlCommand(query, conexion))
                 {
+                    comando.Parameters.AddWithValue("@id", idGrupo);
+                    //Se usa object para poder usar cualquier tipo de dato
+                    object resultado = comando.ExecuteScalar();
+                    claveGrupo= resultado?.ToString();
+                }
+
+                //obtener el id del usuario de todas las personas en el grupo
+                using (MySqlCommand cmdGetName = new MySqlCommand("SELECT id_usuario FROM miembros_grupos WHERE id_grupo=@idGrupo", conexion))
+                {
+                    string claveGrupo1=claveGrupo.ToInt
                     //Lee el id del grupo
                     cmdGetName.Parameters.AddWithValue("@id", claveGrupo);
                     using (MySqlDataReader reader = cmdGetName.ExecuteReader())
                     {
-                        List<int> miembrosIds = new List<int>();
+                       
                         //Checamos si el id esta conectado
                         while (reader.Read())
                         {
                             miembrosIds.Add(Convert.ToInt32(reader["id_usuario"]));
                         }
-                        reader.Close();
-                        //Obtener el nombre del usuario que envio el mensaje
-                        using (MySqlCommand cmdGetSenderName = new MySqlCommand("SELECT nombre FROM usuarios WHERE id=@idUsuario", conexion))
+                    }
+                }
+                //Obtener el nombre del usuario que envio el mensaje
+                using (MySqlCommand cmdGetSenderName = new MySqlCommand("SELECT nombre FROM usuarios WHERE id=@idUsuario", conexion))
+                {
+                   cmdGetSenderName.Parameters.AddWithValue("@idUsuario", idUsuario);
+                   object result = cmdGetSenderName.ExecuteScalar();
+                   if (result != null)
+                   {
+                      nombreUsuario = result.ToString();
+                   }
+                 }
+                //Envia al cliente principañ
+                string mensaje1 = "mensaje_nuevo|" + claveGrupo + "|" + nombreUsuario + "|" + contenido + "\n";
+                Tcpcod.Enviar(cliente, mensaje1);
+                //Enviar el mensaje a todos los miembros del grupo excepto al remitente
+                foreach (int miembroId in miembrosIds)
+                {
+                    if (miembroId != idUsuario)
+                    {
+                        //Obtener el email del miembro
+                        string emailMiembro = "";
+                        using (MySqlCommand cmdGetEmail = new MySqlCommand("SELECT email FROM usuarios WHERE id=@id", conexion))
                         {
-                            cmdGetSenderName.Parameters.AddWithValue("@idUsuario", idUsuario);
-                            object result = cmdGetSenderName.ExecuteScalar();
+                            cmdGetEmail.Parameters.AddWithValue("@id", miembroId);
+                            object result = cmdGetEmail.ExecuteScalar();
                             if (result != null)
                             {
-                                nombreUsuario = result.ToString();
+                                emailMiembro = result.ToString();
                             }
                         }
-                        //Enviar el mensaje a todos los miembros del grupo excepto al remitente
-                        foreach (int miembroId in miembrosIds)
+                        //Enviar el mensaje si el miembro está conectado
+                        lock (lockUsuarios)
                         {
-                            if (miembroId != idUsuario)
+                            if (usuariosConectados.ContainsKey(emailMiembro))
                             {
-                                //Obtener el email del miembro
-                                string emailMiembro = "";
-                                using (MySqlCommand cmdGetEmail = new MySqlCommand("SELECT email FROM usuarios WHERE id=@id", conexion))
-                                {
-                                    cmdGetEmail.Parameters.AddWithValue("@id", miembroId);
-                                    object result = cmdGetEmail.ExecuteScalar();
-                                    if (result != null)
-                                    {
-                                        emailMiembro = result.ToString();
-                                    }
-                                }
-                                //Enviar el mensaje si el miembro está conectado
-                                lock (lockUsuarios)
-                                {
-                                    if(usuariosConectados.ContainsKey(emailMiembro))
-                                    {
-                                        //Obtenemos el TCP del cliente activo
-                                        TcpClient cli = usuariosConectados[emailMiembro];
-                                        string mensaje = "mensaje_nuevo|" + claveGrupo + "|" + nombreUsuario + "|" + contenido;
-                                        _ = enviaraus(cli, mensaje);
-                                    }
-                                }
+                                //Obtenemos el TCP del cliente activo
+                                TcpClient cli = usuariosConectados[emailMiembro];
+                                string mensaje = "mensaje_nuevo|" + claveGrupo + "|" + nombreUsuario + "|" + contenido + "\n";
+                                Tcpcod.Enviar(cli, mensaje);
                             }
                         }
                     }
                 }
-
-
+                
             }
         }
         //cargar mensajes de grupo
@@ -834,6 +854,7 @@ namespace Conexionserver
         {
             try
             {
+                nombreGrupo = nombreGrupo.Replace("\n", "");
                 using (MySqlConnection conexion = new MySqlConnection(MYSQL_CONNECTION_STRING))
                 {
                     conexion.Open();
@@ -847,8 +868,8 @@ namespace Conexionserver
 
                         if (result == null)
                         {
-                            string error = "4|ERROR|Grupo no encontrado";
-                            _ = enviaraus(cliente, error);
+                            string error = "mensajes_grupo|ERROR:Grupo no encontrado\n";
+                            Tcpcod.Enviar(cliente, error);
                             return;
                         }
 
@@ -860,14 +881,33 @@ namespace Conexionserver
                         using (MySqlCommand cmdMensajes = new MySqlCommand(sql, conexion))
                         {
                             cmdMensajes.Parameters.AddWithValue("@id", idGrupo);
+
                             using (MySqlDataReader reader = cmdMensajes.ExecuteReader())
                             {
-                                string resultado = "";
+                                List<string> mensajes = new List<string>();
+
                                 while (reader.Read())
                                 {
-                                    resultado += reader["nombre_usuario"] + "|" + reader["contenido"] + "|" + reader["fecha"] + ";";
+                                    string usuario = reader["nombre_usuario"].ToString();
+                                    string contenido = reader["contenido"].ToString().Replace("\n", " ");
+                                    string fecha = reader["fecha"].ToString();
+
+                                    string msg = usuario + "|" + contenido + "|" + fecha;
+                                    mensajes.Add(msg);
                                 }
-                                _ = enviaraus(cliente, resultado);
+
+                                string res;
+
+                                if (mensajes.Count == 0)
+                                {
+                                    res = "mensajes_grupo|0\n";
+                                }
+                                else
+                                {
+                                    res = "mensajes_grupo|" + string.Join("°", mensajes) + "\n";
+                                }
+
+                                Tcpcod.Enviar(cliente, res);
                             }
                         }
                     }
@@ -875,29 +915,9 @@ namespace Conexionserver
             }
             catch (Exception ex)
             {
-                string error = "4|error|" + ex.Message;
-                _=enviaraus(cliente, error);
+                Tcpcod.Enviar(cliente, "mensajes_grupo|ERROR:" + ex.Message + "\n");
             }
-        }
-
-        private async Task enviaraus(TcpClient cliente, string mensaje)
-        {
-            try
-            {
-                if (!mensaje.EndsWith("\n"))
-                {
-                    mensaje = mensaje + "\n";
-                }
-                NetworkStream net=cliente.GetStream();
-                byte[] bytes = Encoding.UTF8.GetBytes(mensaje);
-                net.Write(bytes, 0, bytes.Length);
-                net.Flush();
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("Error al enviar mensaje al cliente: " + ex.Message);
-            }
-        }
+        }   
     }
 }
 
@@ -911,8 +931,10 @@ public static class Tcpcod
         {
             if (cliente?.Connected == true)
             {
+                mensaje = mensaje.TrimEnd('\n') + "\n";
                 byte[] datos = Encoding.UTF8.GetBytes(mensaje);
                 cliente.GetStream().Write(datos, 0, datos.Length);
+                
             }
         }
         catch (Exception ex)
@@ -929,6 +951,7 @@ public static class Tcpcod
             {
                 byte[] datos = Encoding.UTF8.GetBytes(mensaje);
                 flujo.Write(datos, 0, datos.Length);
+                flujo.Flush();
             }
         }
         catch (Exception ex)
