@@ -15,6 +15,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Web;
 using System.Windows.Forms;
+using System.Windows.Forms.VisualStyles;
 namespace Conexionserver
 {
     public partial class Form1 : Form
@@ -789,9 +790,9 @@ namespace Conexionserver
                 }
 
                 //obtener el id del usuario de todas las personas en el grupo
-                using (MySqlCommand cmdGetName = new MySqlCommand("SELECT id_usuario FROM miembros_grupos WHERE id_grupo=@idGrupo", conexion))
+                using (MySqlCommand cmdGetName = new MySqlCommand("SELECT id_usuario FROM miembros_grupos WHERE id_grupo=@id", conexion))
                 {
-                    string claveGrupo1=claveGrupo.ToInt
+                    int claveGrupo1=Convert.ToInt32(claveGrupo);
                     //Lee el id del grupo
                     cmdGetName.Parameters.AddWithValue("@id", claveGrupo);
                     using (MySqlDataReader reader = cmdGetName.ExecuteReader())
